@@ -41,6 +41,7 @@ interface IConfig {
 // TODO
 // 1. duplicated key
 export default class Service extends EventEmitter {
+  // 核心
   cwd: string;
   pkg: IPackage;
   skipPluginIds: Set<string> = new Set<string>();

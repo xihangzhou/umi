@@ -1,21 +1,25 @@
 import { chalk, yParser } from '@umijs/utils';
 import initWebpack from './initWebpack';
 import { Service } from './ServiceWithBuiltIn';
-import getCwd from './utils/getCwd';
+import getCwd from './utils/getCwd'; // 获取当前进程的工作目录
 import getPkg from './utils/getPkg';
 
 const args = yParser(process.argv.slice(2));
 
 (async () => {
   try {
-    process.env.NODE_ENV = 'development';
+    process.env.NODE_ENV = 'development'; // env中的环境变量设置为development
+    // 初始化webpack之后再来看看
     // Init webpack version determination and require hook
     initWebpack();
 
+    // Service类是CoreService的补充，具体再看
     const service = new Service({
-      cwd: getCwd(),
-      pkg: getPkg(process.cwd()),
+      cwd: getCwd(), // 获取当签node进程运行的目录，即UMI目录
+      pkg: getPkg(process.cwd()), // 获取UMI目录下的package.json文件的绝对路径
     });
+
+    // 开启服务
     await service.run({
       name: 'dev',
       args,
@@ -30,7 +34,7 @@ const args = yParser(process.argv.slice(2));
     process.once('SIGTERM', () => onSignal('SIGTERM'));
 
     function onSignal(signal: string) {
-      if (closed) return;
+      if (closed) return; // 防止连续触发多次
       closed = true;
 
       // 退出时触发插件中的onExit事件

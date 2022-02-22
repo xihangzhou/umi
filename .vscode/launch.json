@@ -1,0 +1,21 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "example" //这里的dev就对应package.json中的scripts中的dev
+      ],
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Program",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/scripts/example.js",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    }
+  ]
+}
