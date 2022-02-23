@@ -21,7 +21,7 @@ import isPromise from './utils/isPromise';
 import loadDotEnv from './utils/loadDotEnv';
 import { pathToObj, resolvePlugins, resolvePresets } from './utils/pluginUtils';
 
-const logger = new Logger('umi:core:Service');
+const logger = new Logger('umi:core:Service'); // console.log方式输出信息的方法实例
 
 export interface IServiceOpts {
   cwd: string;
@@ -40,19 +40,22 @@ interface IConfig {
 
 // TODO
 // 1. duplicated key
+// 这个类继承于EventEmitter，可以发事件或者监听事件等等
 export default class Service extends EventEmitter {
-  // 核心
-  cwd: string;
-  pkg: IPackage;
-  skipPluginIds: Set<string> = new Set<string>();
+  // class上面的属性只是赋值一个初始值，具体的赋值逻辑在constructor中实现
+  cwd: string; // 当前工作目录
+  pkg: IPackage; // package.json的对象形式
+  skipPluginIds: Set<string> = new Set<string>(); // 跳过的插件id
   // lifecycle stage
-  stage: ServiceStage = ServiceStage.uninitialized;
+  stage: ServiceStage = ServiceStage.uninitialized; // 当前的service实例所处的生命周期
   // registered commands
   commands: {
+    // 注册了的命令
     [name: string]: ICommand | string;
   } = {};
   // including presets and plugins
   plugins: {
+    // 预设和插件
     [id: string]: IPlugin;
   } = {};
   // plugin methods
@@ -63,12 +66,13 @@ export default class Service extends EventEmitter {
   initialPresets: IPreset[];
   initialPlugins: IPlugin[];
   // presets and plugins for registering
+  // 还没用，等待被注册的预设和插件
   _extraPresets: IPreset[] = [];
   _extraPlugins: IPlugin[] = [];
   // user config
-  userConfig: IConfig;
-  configInstance: Config;
-  config: IConfig | null = null;
+  userConfig: IConfig; // 用户配置
+  configInstance: Config; // 配置实例
+  config: IConfig | null = null; // 插件配置
   // babel register
   babelRegister: BabelRegister;
   // hooks
@@ -79,6 +83,7 @@ export default class Service extends EventEmitter {
     [key: string]: IHook[];
   } = {};
   // paths
+  // 所有路径的收集
   paths: {
     cwd?: string;
     absNodeModulesPath?: string;
@@ -87,7 +92,11 @@ export default class Service extends EventEmitter {
     absOutputPath?: string;
     absTmpPath?: string;
   } = {};
+  // process.env.NODE_ENV
+  // umi build 就是 production
+  // umi start 就是 development
   env: string | undefined;
+  // 存储一些常量
   ApplyPluginsType = ApplyPluginsType;
   EnableBy = EnableBy;
   ConfigChangeType = ConfigChangeType;
@@ -95,15 +104,16 @@ export default class Service extends EventEmitter {
   args: any;
 
   constructor(opts: IServiceOpts) {
-    super();
+    super(); // 继承EventEmitter，实现父类的constructor
 
     logger.debug('opts:');
     logger.debug(opts);
-    this.cwd = opts.cwd || process.cwd();
+    this.cwd = opts.cwd || process.cwd(); // 属性赋值当前路径
     // repoDir should be the root dir of repo
-    this.pkg = opts.pkg || this.resolvePackage();
-    this.env = opts.env || process.env.NODE_ENV;
+    this.pkg = opts.pkg || this.resolvePackage(); // 赋值package.json文件
+    this.env = opts.env || process.env.NODE_ENV; // 赋值env dev或者production
 
+    // 断言函数，如果existsSync(this.cwd)为false,就抛出一个错误，该错误的提示信息就是第二个参数设定的字符串
     assert(existsSync(this.cwd), `cwd ${this.cwd} does not exist.`);
 
     // register babel before config parsing
@@ -111,12 +121,18 @@ export default class Service extends EventEmitter {
 
     // load .env or .local.env
     logger.debug('load env');
+    // 通过.env或者是.local.env文件加载环境,
     this.loadEnv();
 
     // get user config without validation
     logger.debug('get user config');
-    const configFiles = opts.configFiles;
+    const configFiles = opts.configFiles; // 可以传入配置文件
+
+    // get user config without validation
+    // 创建 Config 对象，获得 userConfig
+    // Config 也是 umi 中非常重要的一个类，负责 umi 配置文件的解析
     this.configInstance = new Config({
+      // 通过传入的配置文件生成管理配置的实例
       cwd: this.cwd,
       service: this,
       localConfig: this.env === 'development',
@@ -125,11 +141,15 @@ export default class Service extends EventEmitter {
           ? configFiles
           : undefined,
     });
-    this.userConfig = this.configInstance.getUserConfig();
+
+    // userConfig 获得配置文件(.umirc.ts 等) export 的对象
+    this.userConfig = this.configInstance.getUserConfig(); // 获取用户自定义配置
     logger.debug('userConfig:');
     logger.debug(this.userConfig);
 
-    // get paths
+    // userConfig 中我们配置了一些路径，这里通过 userConfig 中的配置计算路径。
+    // 比如 userConfig.outputPath 配置了输出文件路径，默认是 dist
+    // 收集所需要的不同文件的绝对路径
     this.paths = getPaths({
       cwd: this.cwd,
       config: this.userConfig!,
@@ -143,16 +163,24 @@ export default class Service extends EventEmitter {
       pkg: this.pkg,
       cwd: this.cwd,
     };
+
+    // 初始化 Presets, 来源于四处
+    // 1. 构造 Service 传参
+    // 2. process.env 中指定
+    // 3. package.json 中 devDependencies 指定
+    // 4. 用户在 .umirc.ts 文件中配置。
     this.initialPresets = resolvePresets({
       ...baseOpts,
       presets: opts.presets || [],
       userConfigPresets: this.userConfig.presets || [],
     });
+    // 提取plugin给initialPresets，处理方式和presets一样
     this.initialPlugins = resolvePlugins({
       ...baseOpts,
       plugins: opts.plugins || [],
       userConfigPlugins: this.userConfig.plugins || [],
     });
+    // initialPresets 和 initialPlugins 放入 babelRegister 中
     this.babelRegister.setOnlyMap({
       key: 'initialPlugins',
       value: lodash.uniq([
@@ -170,6 +198,7 @@ export default class Service extends EventEmitter {
     this.stage = stage;
   }
 
+  // 获取根目录的package.json
   resolvePackage() {
     try {
       return require(join(this.cwd, 'package.json'));
@@ -178,15 +207,16 @@ export default class Service extends EventEmitter {
     }
   }
 
+  // 加载配置环境到process.env
   loadEnv() {
-    const basePath = join(this.cwd, '.env');
-    const localPath = `${basePath}.local`;
-    loadDotEnv(localPath);
-    loadDotEnv(basePath);
+    const basePath = join(this.cwd, '.env'); //获取根目录下的.env文件路径
+    const localPath = `${basePath}.local`; //获取根目录下的.env.local文件路径
+    loadDotEnv(localPath); // 从.env.local文件加载环境变量加入process.env中
+    loadDotEnv(basePath); // 从.env文件加载环境变量加入process.env中，所以.env文件优先级大雨.env.local文件
   }
 
   async init() {
-    this.setStage(ServiceStage.init);
+    this.setStage(ServiceStage.init); // 设置生命周期为init
     // we should have the final hooksByPluginId which is added with api.register()
     await this.initPresetsAndPlugins();
 
@@ -259,9 +289,11 @@ export default class Service extends EventEmitter {
     });
   }
 
+  // 初始化presets和插件
   async initPresetsAndPlugins() {
-    this.setStage(ServiceStage.initPresets);
+    this.setStage(ServiceStage.initPresets); // 设置为initpresets生命周期
     this._extraPlugins = [];
+    // 把initialPresets中的preset从前到后依次init
     while (this.initialPresets.length) {
       await this.initPreset(this.initialPresets.shift()!);
     }
@@ -333,6 +365,7 @@ export default class Service extends EventEmitter {
     const { id, key, apply } = preset;
     preset.isPreset = true;
 
+    // 获取插件api
     const api = this.getPluginAPI({ id, key, service: this });
 
     // register before apply
