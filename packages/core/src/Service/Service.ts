@@ -218,7 +218,7 @@ export default class Service extends EventEmitter {
   async init() {
     this.setStage(ServiceStage.init); // 设置生命周期为init
     // we should have the final hooksByPluginId which is added with api.register()
-    await this.initPresetsAndPlugins();
+    await this.initPresetsAndPlugins(); // 初始化prestes和plugins
 
     // collect false configs, then add to this.skipPluginIds
     // skipPluginIds include two parts:
@@ -239,7 +239,7 @@ export default class Service extends EventEmitter {
 
     // hooksByPluginId -> hooks
     // hooks is mapped with hook key, prepared for applyPlugins()
-    this.setStage(ServiceStage.initHooks);
+    this.setStage(ServiceStage.initHooks); // 生命周期到initHooks
     Object.keys(this.hooksByPluginId).forEach((id) => {
       const hooks = this.hooksByPluginId[id];
       hooks.forEach((hook) => {
@@ -306,9 +306,10 @@ export default class Service extends EventEmitter {
   }
 
   getPluginAPI(opts: any) {
-    const pluginAPI = new PluginAPI(opts);
+    const pluginAPI = new PluginAPI(opts); // 生成插件API实例
 
     // register built-in methods
+    // 注册这些固有的方法
     [
       'onPluginReady',
       'modifyPaths',
@@ -320,9 +321,11 @@ export default class Service extends EventEmitter {
     });
 
     return new Proxy(pluginAPI, {
+      // target:目标对象，property: 被获取的属性名
       get: (target, prop: string) => {
         // 由于 pluginMethods 需要在 register 阶段可用
         // 必须通过 proxy 的方式动态获取最新，以实现边注册边使用的效果
+        // 如果这个方法prop已经被注册了就直接返回执行的结果，注意这个thisy腻味汁箭头函数指向的是service实例
         if (this.pluginMethods[prop]) return this.pluginMethods[prop];
         if (
           [
@@ -362,11 +365,11 @@ export default class Service extends EventEmitter {
   }
 
   async initPreset(preset: IPreset) {
-    const { id, key, apply } = preset;
-    preset.isPreset = true;
+    const { id, key, apply } = preset; // 从preset的描述对象中取出要的部分
+    preset.isPreset = true; // 加上一个isPreset为true的属性
 
     // 获取插件api
-    const api = this.getPluginAPI({ id, key, service: this });
+    const api = this.getPluginAPI({ id, key, service: this }); // 传入插件的id,key和service去换取插件的api
 
     // register before apply
     this.registerPlugin(preset);
@@ -566,6 +569,7 @@ ${name} from ${plugin.path} register failed.`);
   }
 
   async run({ name, args = {} }: { name: string; args?: any }) {
+    // name为环境变量，args为参数
     args._ = args._ || [];
     // shift the command itself
     if (args._[0] === name) args._.shift();
@@ -576,8 +580,9 @@ ${name} from ${plugin.path} register failed.`);
     logger.debug('plugins:');
     logger.debug(this.plugins);
 
-    this.setStage(ServiceStage.run);
+    this.setStage(ServiceStage.run); // 设置生命周期到run阶段
     await this.applyPlugins({
+      // 应用插件
       key: 'onStart',
       type: ApplyPluginsType.event,
       args: {
@@ -585,7 +590,7 @@ ${name} from ${plugin.path} register failed.`);
         args,
       },
     });
-    return this.runCommand({ name, args });
+    return this.runCommand({ name, args }); // 执行
   }
 
   async runCommand({ name, args = {} }: { name: string; args?: any }) {

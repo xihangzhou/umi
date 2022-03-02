@@ -14,10 +14,10 @@ interface IOpts {
 }
 
 export default class PluginAPI {
-  id: string;
+  id: string; // 描述插件的信息类中的id
   key: string;
   service: Service;
-  Html: typeof Html;
+  Html: typeof Html; // Html类，暂时不看
   utils: typeof utils;
   logger: Logger;
 
@@ -70,7 +70,9 @@ export default class PluginAPI {
     plugins[this.id].enableBy = enableBy || EnableBy.register;
   }
 
+  // 使用pluginId分类的注册方法，注册到service实例
   register(hook: IHook) {
+    // 首先先判断hook的格式是否正确
     assert(
       hook.key && typeof hook.key === 'string',
       `api.register() failed, hook.key must supplied and should be string, but got ${hook.key}.`,
@@ -79,11 +81,14 @@ export default class PluginAPI {
       hook.fn && typeof hook.fn === 'function',
       `api.register() failed, hook.fn must supplied and should be function, but got ${hook.fn}.`,
     );
+    // hooksByPluginId 就是指被pluginId所分类的hooks
+    // 所以注册的过程其实就是把一个plugin的hook放到hooksByPluginId中
     this.service.hooksByPluginId[this.id] = (
       this.service.hooksByPluginId[this.id] || []
     ).concat(hook);
   }
 
+  // 注册把命令注册到service实例上
   registerCommand(command: ICommand) {
     const { name, alias } = command;
     assert(
@@ -96,7 +101,9 @@ export default class PluginAPI {
     }
   }
 
+  // 把presets注册到service实例的_extraPresets上，并放到最前面优先执行
   registerPresets(presets: (IPreset | string)[]) {
+    // 只有在initPresets阶段才可以执行这个方法
     assert(
       this.service.stage === ServiceStage.initPresets,
       `api.registerPresets() failed, it should only used in presets.`,
@@ -105,6 +112,7 @@ export default class PluginAPI {
       Array.isArray(presets),
       `api.registerPresets() failed, presets must be Array.`,
     );
+    // 看下传入的presets是不是信息对象，如果不是的话就转换成信息对象
     const extraPresets = presets.map((preset) => {
       return isValidPlugin(preset as any)
         ? (preset as IPreset)
@@ -114,11 +122,11 @@ export default class PluginAPI {
             cwd: this.service.cwd,
           });
     });
-    // 插到最前面，下个 while 循环优先执行
+    // 插到_extraPresets最前面，下个 while 循环优先执行
     this.service._extraPresets.splice(0, 0, ...extraPresets);
   }
 
-  // 在 preset 初始化阶段放后面，在插件注册阶段放前面
+  // 同注册presets
   registerPlugins(plugins: (IPlugin | string)[]) {
     assert(
       this.service.stage === ServiceStage.initPresets ||
@@ -145,6 +153,7 @@ export default class PluginAPI {
     }
   }
 
+  // 注册方法,放在service实例的pluginMethods上
   registerMethod({
     name,
     fn,
@@ -155,7 +164,9 @@ export default class PluginAPI {
     exitsError?: boolean;
   }) {
     if (this.service.pluginMethods[name]) {
+      // 如果已经存在了，即如果已经注册过了这个方法就直接返回
       if (exitsError) {
+        // 如果还传入了错误就直接报错
         throw new Error(
           `api.registerMethod() failed, method ${name} is already exist.`,
         );
@@ -163,11 +174,13 @@ export default class PluginAPI {
         return;
       }
     }
+    // 如果传入了注册的方法fn就用这个
     this.service.pluginMethods[name] =
       fn ||
       // 这里不能用 arrow function，this 需指向执行此方法的 PluginAPI
       // 否则 pluginId 会不会，导致不能正确 skip plugin
       function (fn: Function | Object) {
+        // 否则自己传入一个用于注册hook的函数
         const hook = {
           key: name,
           ...(utils.lodash.isPlainObject(fn) ? fn : { fn }),
