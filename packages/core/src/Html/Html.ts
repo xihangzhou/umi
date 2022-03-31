@@ -101,6 +101,8 @@ class Html {
       cssFiles = [],
     } = args;
     const { config } = this;
+    // html模版路径
+    // 就是document.ejs文件
     if (tplPath) {
       assert(
         existsSync(tplPath),
@@ -116,18 +118,21 @@ class Html {
       // 不输出多个 HTML 时 route 无意义
       ...(config.exportStatic ? { route } : {}),
     };
+    // 渲染ejs模版
     let html = ejs.render(tpl, context, {
       _with: false,
       localsName: 'context',
       filename: 'document.ejs',
     });
 
+    // cheerio是一个库，传入html字符串，然后在node上像操作真实的DOM一样去操控html文件，提供类似jQuery的操作api,所以返回的是一个$
     let $ = cheerio.load(html, {
       // @ts-ignore
       decodeEntities: false,
     });
 
     // metas
+    // 在head标签中添加meta标签
     metas.forEach((meta) => {
       $('head').append(
         [
@@ -141,6 +146,7 @@ class Html {
     });
 
     // links
+    // 在head标签中添加link标签
     links.forEach((link) => {
       $('head').append(
         [
@@ -154,6 +160,7 @@ class Html {
     });
 
     // styles
+    // 添加style标签
     styles.forEach((style) => {
       const { content = '', ...attrs } = style;
       const newAttrs = Object.keys(attrs).reduce((memo, key) => {
@@ -172,6 +179,7 @@ class Html {
     });
 
     // css
+    // 添加link标签
     cssFiles.forEach((file) => {
       $('head').append(
         `<link rel="stylesheet" href="${this.getAsset({
@@ -182,6 +190,7 @@ class Html {
     });
 
     // root element
+    // 获取挂载内容的根节点
     const mountElementId = config.mountElementId || 'root';
     if (!$(`#${mountElementId}`).length) {
       const bodyEl = $('body');

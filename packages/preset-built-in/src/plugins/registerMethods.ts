@@ -53,7 +53,7 @@ export default function (api: IApi) {
     'modifyRendererPath',
     'modifyRoutes',
   ].forEach((name) => {
-    api.registerMethod({ name });
+    api.registerMethod({ name }); // 注册这些固有的方法到this.service.pluginMethods[name]上，如果没有传入fn就意味着有一个默认的fn,这个默认的fn以一个函数为参数，将这个函数钩子注册到this.service.hooksByPluginId[this.id]上
   });
 
   api.registerMethod({

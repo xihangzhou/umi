@@ -21,6 +21,7 @@ export default class DevCompileDonePlugin {
 
   apply(compiler: webpack.Compiler) {
     let isFirstCompile = true;
+    // 注册DevFirstCompileDone方法到webpack的done周期上，即在 compilation 完成时执行。
     compiler.hooks.done.tap('DevFirstCompileDone', (stats) => {
       if (stats.hasErrors()) {
         // make sound
@@ -33,6 +34,7 @@ export default class DevCompileDonePlugin {
         return;
       }
 
+      // 如果是第一次编译完成的话给一些提示信息
       if (isFirstCompile) {
         const lanIp = address.ip();
         const protocol = this.opts.https ? 'https' : 'http';
@@ -61,6 +63,7 @@ export default class DevCompileDonePlugin {
         );
       }
 
+      // 调用传入的回调函数
       this.opts.onCompileDone?.({
         isFirstCompile,
         stats,

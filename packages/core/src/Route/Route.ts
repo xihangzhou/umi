@@ -27,12 +27,15 @@ class Route {
     this.opts = opts || {};
   }
 
+  // 外部调用的实例方法，将用户的路由配置的各种path变为绝对路径并返回，这个修正相对路径为绝对路径的过程为patch
   async getRoutes(opts: IGetRoutesOpts) {
-    const { config, root, componentPrefix } = opts;
+    const { config, root, componentPrefix } = opts; // 这个config就是/config中导出的自定义配置文件
     // 避免修改配置里的 routes，导致重复 patch
-    let routes = lodash.cloneDeep(config.routes);
+    let routes = lodash.cloneDeep(config.routes); // config.routes就是自定义导出的routes文件
     let isConventional = false;
     if (!routes) {
+      // 如果没有自定义路由就使用默认配置路由
+      // 如果没有自定义
       assert(root, `opts.root must be supplied for conventional routes.`);
       routes = this.getConventionRoutes({
         root: root!,
@@ -50,6 +53,7 @@ class Route {
 
   // TODO:
   // 1. 移动 /404 到最后，并处理 component 和 redirect
+  // patchRoutes就只是把现在的routes patchRoute一下而已，调用了key为onPatchRoutesBefore和onPatchRoutes的钩子，具体的注册方式应该在patchRoute中
   async patchRoutes(routes: IRoute[], opts: IGetRoutesOpts) {
     if (this.opts.onPatchRoutesBefore) {
       await this.opts.onPatchRoutesBefore({
@@ -68,7 +72,9 @@ class Route {
     }
   }
 
+  // patchRoute方法就是针对一个路由，根据配置的path，redirect等路径相关的配置信息找到最后的目标路径，获取对应路由目标组件的地址
   async patchRoute(route: IRoute, opts: IGetRoutesOpts) {
+    // 执行onPatchRouteBefore
     if (this.opts.onPatchRouteBefore) {
       await this.opts.onPatchRouteBefore({
         route,
@@ -77,6 +83,7 @@ class Route {
     }
 
     // route.path 的修改需要在子路由 patch 之前做
+    // 如果是相对路径就要和parentRoute?.path进行拼接
     if (
       route.path &&
       route.path.charAt(0) !== '/' &&
@@ -84,12 +91,14 @@ class Route {
     ) {
       route.path = winPath(join(opts.parentRoute?.path || '/', route.path));
     }
+    // 如果有跳转逻辑就也进行拼接
     if (route.redirect && route.redirect.charAt(0) !== '/') {
       route.redirect = winPath(
         join(opts.parentRoute?.path || '/', route.redirect),
       );
     }
 
+    // 如果有子路由就递归处理
     if (route.routes) {
       await this.patchRoutes(route.routes, {
         ...opts,
@@ -103,6 +112,7 @@ class Route {
     }
 
     // resolve component path
+    // 获取component的绝对路径
     if (
       route.component &&
       !opts.isConventional &&

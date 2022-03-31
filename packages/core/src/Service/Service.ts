@@ -240,6 +240,7 @@ export default class Service extends EventEmitter {
     // hooksByPluginId -> hooks
     // hooks is mapped with hook key, prepared for applyPlugins()
     this.setStage(ServiceStage.initHooks); // 生命周期到initHooks
+    // 把hooksByPluginId中的信息提取到hooks中，本来是用pluginId分类的hook，现在按照key分类hooks
     Object.keys(this.hooksByPluginId).forEach((id) => {
       const hooks = this.hooksByPluginId[id];
       hooks.forEach((hook) => {
@@ -299,7 +300,9 @@ export default class Service extends EventEmitter {
     }
 
     this.setStage(ServiceStage.initPlugins);
+    // 把initialPlugins放到_extraPlugins最后
     this._extraPlugins.push(...this.initialPlugins);
+    // _extraPlugins从前向后依次init
     while (this._extraPlugins.length) {
       await this.initPlugin(this._extraPlugins.shift()!);
     }
@@ -357,6 +360,8 @@ export default class Service extends EventEmitter {
   }
 
   async applyAPI(opts: { apply: Function; api: PluginAPI }) {
+    // opts.apply就是在utils/pluginUtils中定义的pathToObj方法中返回的apply函数
+    // 执行了apply方法后的返回值是插件的export出的函数，这个函数的返回值是一个对象，其中包含了插件中有的presets,plugins的路径信息，入参是api这个plugin对象，可以通过这个对象去访问service上注册的方法
     let ret = opts.apply()(opts.api);
     if (isPromise(ret)) {
       ret = await ret;
@@ -372,6 +377,7 @@ export default class Service extends EventEmitter {
     const api = this.getPluginAPI({ id, key, service: this }); // 传入插件的id,key和service去换取插件的api
 
     // register before apply
+    // 在this.plugins上建立id到IPreset的映射关系
     this.registerPlugin(preset);
     // TODO: ...defaultConfigs 考虑要不要支持，可能这个需求可以通过其他渠道实现
     const { presets, plugins, ...defaultConfigs } = await this.applyAPI({
@@ -490,25 +496,29 @@ ${name} from ${plugin.path} register failed.`);
   }
 
   async applyPlugins(opts: {
-    key: string;
-    type: ApplyPluginsType;
-    initialValue?: any;
-    args?: any;
+    key: string; // hook的key,一个key对应多个hook
+    type: ApplyPluginsType; // 应用插件的类型
+    initialValue?: any; // 使用插件的初始值
+    args?: any; // hook的fn的参数，即使用插件的回调函数的参数
   }) {
-    const hooks = this.hooks[opts.key] || [];
+    const hooks = this.hooks[opts.key] || []; // 获取有同样key的所有hook
     switch (opts.type) {
       case ApplyPluginsType.add:
+        // 如果有initialValue,这个值必须为数组
         if ('initialValue' in opts) {
           assert(
             Array.isArray(opts.initialValue),
             `applyPlugins failed, opts.initialValue must be Array if opts.type is add.`,
           );
         }
+        // 新建一个hook,参数为memo,tapable提供的hook,一个key对应了一个tapable的hook
         const tAdd = new AsyncSeriesWaterfallHook(['memo']);
         for (const hook of hooks) {
+          // 如果插件不可用就不管
           if (!this.isPluginEnable(hook.pluginId!)) {
             continue;
           }
+          // 注册这个hook到对应实例上
           tAdd.tapPromise(
             {
               name: hook.pluginId!,
@@ -517,11 +527,13 @@ ${name} from ${plugin.path} register failed.`);
               before: hook.before,
             },
             async (memo: any[]) => {
+              // 回调函数中执行了hook中的fn并且传入了opts.args参数
               const items = await hook.fn(opts.args);
               return memo.concat(items);
             },
           );
         }
+        // 返回执行这个tAdd钩子实例的promise实例
         return await tAdd.promise(opts.initialValue || []);
       case ApplyPluginsType.modify:
         const tModify = new AsyncSeriesWaterfallHook(['memo']);
@@ -537,6 +549,7 @@ ${name} from ${plugin.path} register failed.`);
               before: hook.before,
             },
             async (memo: any) => {
+              // mdify是把memo和args一起穿给了fn
               return await hook.fn(memo, opts.args);
             },
           );
@@ -560,6 +573,7 @@ ${name} from ${plugin.path} register failed.`);
             },
           );
         }
+        // event方式直接就用promise调用，不需要传参数
         return await tEvent.promise();
       default:
         throw new Error(
@@ -568,6 +582,7 @@ ${name} from ${plugin.path} register failed.`);
     }
   }
 
+  // name和args在外层的命令行获取传入
   async run({ name, args = {} }: { name: string; args?: any }) {
     // name为环境变量，args为参数
     args._ = args._ || [];
@@ -593,6 +608,7 @@ ${name} from ${plugin.path} register failed.`);
     return this.runCommand({ name, args }); // 执行
   }
 
+  // 外层获取传入
   async runCommand({ name, args = {} }: { name: string; args?: any }) {
     assert(this.stage >= ServiceStage.init, `service is not initialized.`);
 

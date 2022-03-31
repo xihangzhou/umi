@@ -21,6 +21,7 @@ export default (api: IApi) => {
               if (isFirstCompile) {
                 api.service.emit('firstDevCompileDone');
               }
+              // 执行onDevCompileDone周期
               api
                 .applyPlugins({
                   key: 'onDevCompileDone',

@@ -25,6 +25,7 @@ class Bundler {
     this.config = config;
   }
 
+  // 传入opts获取真正的webpack配置
   async getConfig(
     opts: Omit<IGetConfigOpts, 'cwd' | 'config'>,
   ): Promise<defaultWebpack.Configuration> {
@@ -106,6 +107,7 @@ class Bundler {
     const compiler = bundleImplementor.webpack(bundleConfigs);
     const { ssr, devServer } = this.config;
     // 这里不做 winPath 处理，是为了和下方的 path.sep 匹配上
+    // 使用webpackDevMiddleware对webpack的文件进行监听，如果文件有改变就重新编译
     const compilerMiddleware = webpackDevMiddleware(compiler, {
       // must be /, otherwise it will exec next()
       publicPath: '/',

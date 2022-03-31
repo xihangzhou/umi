@@ -58,9 +58,11 @@ export interface IOpts {
   __disableTerserForTest?: boolean;
 }
 
+// 通过webpack-chain包获取真正的webpack配置
 export default async function getConfig(
   opts: IOpts,
 ): Promise<defaultWebpack.Configuration> {
+  // webpack初始化去执行最开始webpackInit的时候放进去的回调函数
   await onWebpackInitWithPromise();
   const {
     cwd,
@@ -71,7 +73,7 @@ export default async function getConfig(
     hot,
     port,
     mfsu,
-    bundleImplementor = defaultWebpack,
+    bundleImplementor = defaultWebpack, // 实际用来打包的工具叫做bundleImplementor，这里引入的defaultWebpack就是最开始的时候require的webpack版本
     modifyBabelOpts,
     modifyBabelPresetOpts,
     miniCSSExtractPluginPath,
@@ -87,6 +89,7 @@ export default async function getConfig(
   const disableCompress = process.env.COMPRESS === 'none';
 
   // entry
+  // 添加entry入口配置
   if (entry) {
     Object.keys(entry).forEach((key) => {
       const e = webpackConfig.entry(key);
@@ -102,6 +105,8 @@ export default async function getConfig(
   }
 
   // devtool
+  // devtool配置
+  // https://webpack.docschina.org/configuration/devtool/
   const devtool = config.devtool as Config.DevTool;
   webpackConfig.devtool(
     isDev
@@ -115,6 +120,7 @@ export default async function getConfig(
   const useHash = (mfsu && isDev) || (config.hash && isProd);
   const absOutputPath = join(cwd, config.outputPath || 'dist');
 
+  // 配置output
   webpackConfig.output
     .path(absOutputPath)
     .filename(useHash ? `[name].[contenthash:8].js` : `[name].js`)
@@ -131,9 +137,10 @@ export default async function getConfig(
 
   // resolve
   // prettier-ignore
+  // 配置webpack resolve定义模块如何被解析的
   webpackConfig.resolve
     // 不能设为 false，因为 tnpm 是通过 link 处理依赖，设为 false tnpm 下会有大量的冗余模块
-    .set('symlinks', true)
+    .set('symlinks', true) // 设置symlinks选项
     .modules
       .add('node_modules')
       .add(join(__dirname, '../../node_modules'))
@@ -154,6 +161,7 @@ export default async function getConfig(
     ]);
 
   // resolve.alias
+  // 别名配置
   if (config.alias) {
     Object.keys(config.alias).forEach((key) => {
       webpackConfig.resolve.alias.set(key, config.alias![key]);
@@ -167,6 +175,7 @@ export default async function getConfig(
 
   // modules and loaders ---------------------------------------------
 
+  // 根据浏览器来获取babel的配置
   const { targets, browserslist } = getTargetsAndBrowsersList({
     config,
     type,
@@ -195,6 +204,7 @@ export default async function getConfig(
   }
 
   // prettier-ignore
+  // 配置babel
   webpackConfig.module
     .rule('js')
       .test(/\.(js|mjs|jsx|ts|tsx)$/)
@@ -214,6 +224,7 @@ export default async function getConfig(
         .loader(require.resolve('@umijs/deps/compiled/babel-loader'))
         .options(babelOpts);
 
+  // 额外的babel配置
   if (config.extraBabelIncludes) {
     config.extraBabelIncludes.forEach((include, index) => {
       const rule = `extraBabelInclude_${index}`;
@@ -253,6 +264,8 @@ export default async function getConfig(
   const rule = webpackConfig.module
     .rule('js-in-node_modules')
       .test(/\.(js|mjs)$/);
+  // nodeModulesTransform指定有一些包不编译，具体的逻辑参考
+  // https://umijs.org/zh-CN/config#nodemodulestransform
   const nodeModulesTransform = config.nodeModulesTransform || {
     type: 'all',
     exclude: [],
@@ -371,6 +384,7 @@ export default async function getConfig(
   }
 
   // css
+  // 处理css的配置
   css({
     type,
     mfsu,
@@ -384,6 +398,7 @@ export default async function getConfig(
   });
 
   // externals
+  // 额外的webpack配置
   if (config.externals) {
     webpackConfig.externals(config.externals);
   }
@@ -600,6 +615,7 @@ export default async function getConfig(
     });
   }
 
+  // 如果用户配置了chainWebpack就把这些webpack配置丢到chainWebpack中让用户处理
   if (opts.chainWebpack) {
     webpackConfig = await opts.chainWebpack(webpackConfig, {
       type,
@@ -609,6 +625,7 @@ export default async function getConfig(
     });
   }
   // 用户配置的 chainWebpack 优先级最高
+  // 这个chainWebpack也可以写在config中
   if (config.chainWebpack) {
     // @ts-ignore
     await config.chainWebpack(webpackConfig, {
@@ -619,6 +636,7 @@ export default async function getConfig(
       createCSSRule: createCSSRuleFn,
     });
   }
+  // 使用toConfig()方法生成最终的webpack配置json
   let ret = webpackConfig.toConfig() as defaultWebpack.Configuration;
 
   // node polyfills

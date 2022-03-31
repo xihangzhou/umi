@@ -25,7 +25,7 @@ export default () => {
   // 2. if have webpack5:
   // 3. init webpack with webpack5 flag
 
-  let cwd = process.cwd();
+  let cwd = process.cwd(); // 返回当前terminal工作目录
   if (process.env.APP_ROOT) {
     cwd = join(cwd, process.env.APP_ROOT);
   }

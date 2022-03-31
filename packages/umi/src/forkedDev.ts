@@ -15,8 +15,8 @@ const args = yParser(process.argv.slice(2));
 
     // Service类是CoreService的补充，具体再看
     const service = new Service({
-      cwd: getCwd(), // 获取当签node进程运行的目录，即UMI目录
-      pkg: getPkg(process.cwd()), // 获取UMI目录下的package.json文件的绝对路径
+      cwd: getCwd(), // 获取当前process中的APP_ROOT的绝对目录，即任务进行的目录
+      pkg: getPkg(process.cwd()), // 获取这个目录下的package.json的位置
     });
 
     // 开启服务

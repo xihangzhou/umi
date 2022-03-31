@@ -90,9 +90,9 @@ const defaultOpts: Required<PartialProps<IServerOpts>> = {
 class Server {
   app: Express;
   opts: Required<IServerOpts>;
-  socketServer?: SocketServer;
+  socketServer?: SocketServer; // 生辰过的socketServer
   // @ts-ignore
-  listeningApp: http.Server;
+  listeningApp: http.Server; // 生成的服务器服务实例
   // @ts-ignore
   listeninspdygApp: http.Server;
   sockets: Connection[] = [];
@@ -102,12 +102,13 @@ class Server {
   constructor(opts: IServerOpts) {
     this.opts = {
       ...defaultOpts,
-      ...lodash.omitBy(opts, lodash.isUndefined),
+      ...lodash.omitBy(opts, lodash.isUndefined), // 删除undefined的值
     };
-    this.app = express();
-    this.setupFeatures();
-    this.createServer();
+    this.app = express(); // 使用express框架来进行服务的书写
+    this.setupFeatures(); // 设置这个服务的各种中间件
+    this.createServer(); // 新建服务
 
+    // 如果监听到了upgrade事件就要执行wsProxy中的upgrade方法
     this.socketProxies.forEach((wsProxy) => {
       // subscribe to http 'upgrade'
       // @ts-ignore
@@ -116,6 +117,7 @@ class Server {
   }
 
   private getHttpsOptions(): object | undefined {
+    // 如果开启了https的要求就要获取凭证等一系列东西
     if (this.opts.https) {
       const credential = getCredentials(this.opts);
 
@@ -142,10 +144,15 @@ class Server {
     return;
   }
 
+  // 这个setupFeatures就是去设置中间件的过程，注意express的中间件按顺序深度遍历递归执行
   setupFeatures() {
     const features = {
       compress: () => {
+        this.app.get('/', function (req, res) {
+          console.log('Cookies: ');
+        });
         if (this.opts.compress) {
+          // 如果有设置compress就采用compress中间件
           this.setupCompress();
         }
       },
@@ -155,22 +162,26 @@ class Server {
         }
       },
       beforeMiddlewares: () => {
+        // 应用传入的中间件
         this.opts.beforeMiddlewares.forEach((middleware) => {
           // @ts-ignore
           this.app.use(middleware);
         });
       },
+      // 设置代理
       proxy: () => {
         if (this.opts.proxy) {
           this.setupProxy();
         }
       },
+      // 编译中间件
       compilerMiddleware: () => {
         if (this.opts.compilerMiddleware) {
           // @ts-ignore
-          this.app.use(this.opts.compilerMiddleware);
+          this.app.use(this.opts.compilerMiddleware); // 这个compilerMiddleware就是webpack返回的compilerMiddleware
         }
       },
+      // 最后的中间件，注意在编译中间件运行之后，当afterMiddlewares执行的时候理论上是需要编译完成了的
       afterMiddlewares: () => {
         this.opts.afterMiddlewares.forEach((middleware) => {
           // @ts-ignore
@@ -190,7 +201,7 @@ class Server {
   setupHeaders() {
     this.app.all('*', (req, res, next) => {
       // eslint-disable-next-line
-      res.set(this.opts.headers);
+      res.set(this.opts.headers); // 设置响应头
       next();
     });
   }
@@ -387,13 +398,14 @@ class Server {
     });
   }
 
+  // 建立服务，如果是https建立https服务，并且把服务放在listeningApp上
   createServer() {
     const httpsOpts = this.getHttpsOptions();
     if (httpsOpts) {
       // http2 using spdy, HTTP/2 by default when using https
       this.listeningApp = spdy.createServer(httpsOpts, this.app);
     } else {
-      this.listeningApp = http.createServer(this.app);
+      this.listeningApp = http.createServer(this.app); // 使用http.createServer的方式传入express实例生成一个实例
     }
   }
 
@@ -412,7 +424,7 @@ class Server {
     const foundPort = await portfinder.getPortPromise({ port });
     return new Promise((resolve) => {
       this.listeningApp.listen(foundPort, hostname, 5, () => {
-        this.createSocketServer();
+        this.createSocketServer(); // 创建这个server服务对应的socket服务从tcpip的层面上去控制每一次tcp连接
         const ret = {
           port: foundPort,
           hostname,

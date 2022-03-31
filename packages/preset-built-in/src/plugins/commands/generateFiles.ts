@@ -2,6 +2,7 @@ import { IApi } from '@umijs/types';
 import { chokidar, lodash, winPath } from '@umijs/utils';
 import { join } from 'path';
 
+// watch参数是否监听
 export default async ({ api, watch }: { api: IApi; watch?: boolean }) => {
   const { paths } = api;
 
@@ -18,9 +19,13 @@ export default async ({ api, watch }: { api: IApi; watch?: boolean }) => {
 
   const watchers: chokidar.FSWatcher[] = [];
 
+  // generate方法掉用onGenerateFiles周期，去生成对应的这些.umi下的文件
   await generate();
 
+  // 再通过watch参数判断是否需要监听如下的文件的变动，如果需要监听的话就需要创建watch去监听这些文件的变化，如果有变化就要重新生成对应的.umi临时文件
+  // 这些文件的具体作用可以看官网
   if (watch) {
+    // 掉用addTmpGenerateWatcherPaths生命周期，如果没有注册hooks就直接返回初始的initialValue
     const watcherPaths = await api.applyPlugins({
       key: 'addTmpGenerateWatcherPaths',
       type: api.ApplyPluginsType.add,
@@ -33,6 +38,7 @@ export default async ({ api, watch }: { api: IApi; watch?: boolean }) => {
         join(paths.absSrcPath!, 'app.js'),
       ],
     });
+    // 对不重复的路径生成watcher
     lodash
       .uniq<string>(watcherPaths.map((p: string) => winPath(p)))
       .forEach((p: string) => {

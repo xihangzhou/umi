@@ -62,6 +62,8 @@ function RouterComponent(props: IRouterComponentProps) {
     return history.listen(routeChangeHandler);
   }, [history]);
 
+  // 调用react-router提供的能力生成含有路由的结构
+  // 传入history实例用于监控浏览器路由的变化
   return <Router history={history}>{renderRoutes(renderRoutesProps)}</Router>;
 }
 

@@ -17,12 +17,14 @@ export async function getBundleAndConfigs({
   port?: number;
 }) {
   // bundler
+  // 调用modifyBundler生命周期去修改Bundler类，，如果没有修改的话就返回默认的原始Bundler类
   const Bundler = await api.applyPlugins({
     type: api.ApplyPluginsType.modify,
     key: 'modifyBundler',
     initialValue: DefaultBundler,
   });
 
+  // 同样获取bundleImplementor，如果没有定义就是undefined
   const bundleImplementor = await api.applyPlugins({
     key: 'modifyBundleImplementor',
     type: api.ApplyPluginsType.modify,
@@ -30,8 +32,10 @@ export async function getBundleAndConfigs({
   });
 
   // get config
+  // 传入渲染方式是ssr还是csr获取对应的webpack的配置
   async function getConfig({ type }: { type: IBundlerConfigType }) {
     const env: Env = api.env === 'production' ? 'production' : 'development';
+    // modifyBundleConfigOpts钩子返回获取webpack配置的初始选项，即告诉我们需要哪些webpack的配置
     const getConfigOpts = await api.applyPlugins({
       type: api.ApplyPluginsType.modify,
       key: 'modifyBundleConfigOpts',
@@ -79,6 +83,7 @@ export async function getBundleAndConfigs({
         mfsu,
       },
     });
+    // 最后通过bundler.getConfig 传入getConfigOpts获取最终的webpack配置
     return await api.applyPlugins({
       type: api.ApplyPluginsType.modify,
       key: 'modifyBundleConfig',
@@ -91,14 +96,16 @@ export async function getBundleAndConfigs({
     });
   }
 
+  // 使用上面的类生成一个bundler实例
   const bundler: DefaultBundler = new Bundler({
-    cwd: api.cwd,
-    config: api.config,
+    cwd: api.cwd, // 传入current work directory
+    config: api.config, // 传入config
   });
   const bundlerArgs = {
     env: api.env,
     bundler: { id: Bundler.id, version: Bundler.version },
   };
+  // 调用生成周期modifyBundleConfigs对应的钩子，这个生命周期的初始值是getConfig的返回值
   const bundleConfigs = await api.applyPlugins({
     type: api.ApplyPluginsType.modify,
     key: 'modifyBundleConfigs',

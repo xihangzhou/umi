@@ -2,6 +2,7 @@ import { Route } from '@umijs/core';
 import { IApi } from '@umijs/types';
 
 export default function (api: IApi) {
+  // 注册这个插件的描述信息
   api.describe({
     key: 'routes',
     config: {
@@ -31,9 +32,11 @@ export default function (api: IApi) {
     },
   });
 
+  // 注册getRoutes方法
   api.registerMethod({
     name: 'getRoutes',
     async fn() {
+      // 生成Route实例
       const route = new Route({
         async onPatchRoutesBefore(args: object) {
           await api.applyPlugins({

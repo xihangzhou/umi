@@ -70,28 +70,33 @@ export default (api: IApi) => {
       const defaultPort =
         // @ts-ignore
         process.env.PORT || args?.port || api.config.devServer?.port;
+      // 确定本地服务器的运行端口
       port = await portfinder.getPortPromise({
         port: defaultPort ? parseInt(String(defaultPort), 10) : 8000,
       });
       // @ts-ignore
-      hostname = process.env.HOST || api.config.devServer?.host || '0.0.0.0';
+      hostname = process.env.HOST || api.config.devServer?.host || '0.0.0.0'; // 确定hostname
       console.log(chalk.cyan('Starting the development server...'));
-      process.send?.({ type: 'UPDATE_PORT', port });
+      process.send?.({ type: 'UPDATE_PORT', port }); // 向父进程发送UPDATE_PORT事件，带上端口号
 
       // enable https, HTTP/2 by default when using --https
-      const isHTTPS = process.env.HTTPS || args?.https;
+      const isHTTPS = process.env.HTTPS || args?.https; // 确定是否是https协议的本地服务器
 
+      // 清除掉.umi文件下除了catche之外的其他文件
       cleanTmpPathExceptCache({
-        absTmpPath: paths.absTmpPath!,
+        absTmpPath: paths.absTmpPath!, // Users/zhouxihang/Desktop/my-projects/umi/examples/hello-world/.umi
       });
-      const watch = process.env.WATCH !== 'none';
+      const watch = process.env.WATCH !== 'none'; // 是否watch
 
       // generate files
+      // unwatchGenerateFiles是一个函数，用来取消对这次generateFiles对文件的监听
       const unwatchGenerateFiles = await generateFiles({ api, watch });
       if (unwatchGenerateFiles) unwatchs.push(unwatchGenerateFiles);
 
+      // 监听package.json和用户配置，如果有改动的话需要重新启动服务
       if (watch) {
         // watch pkg changes
+        // 监听package.json文件，如果umi相关的依赖发生了变化就执行onChange,返回值为取消这次监听的函数
         const unwatchPkg = watchPkg({
           cwd: api.cwd,
           onChange() {
@@ -104,9 +109,11 @@ export default (api: IApi) => {
 
         // watch config change
         const unwatchConfig = api.service.configInstance.watch({
+          // 监听userConfig实例，即用户的自定义配置实例
           userConfig: api.service.userConfig,
           onChange: async ({ pluginChanged, userConfig, valueChanged }) => {
             if (pluginChanged.length) {
+              // 如果umi相关插件发生变化要重启
               console.log();
               api.logger.info(
                 `Plugins of ${pluginChanged
@@ -175,14 +182,20 @@ export default (api: IApi) => {
       // https://github.com/yessky/webpack-mild-compile
       await delay(500);
 
-      // dev
+      // bundler实例:bundler相关的一系列方法，用于管理bundler
+      // bundleConfigs:bundler的配置
+      // bundleImplementor:使用的打包的工具
       const { bundler, bundleConfigs, bundleImplementor } =
         await getBundleAndConfigs({ api, port });
+      // 返回一个开发时服务器选项的opts
+      // opts上指定了生成的node服务器的相关选项配置
+      // 比如：compilerMiddleware 编译中间件
       const opts: IServerOpts = bundler.setupDevServerOpts({
         bundleConfigs: bundleConfigs,
         bundleImplementor,
       });
 
+      // 在中间件之前的插件
       const beforeMiddlewares = [
         ...(await api.applyPlugins({
           key: 'addBeforeMiddewares',
@@ -197,6 +210,7 @@ export default (api: IApi) => {
           args: {},
         })),
       ];
+      // 中间件
       const middlewares = [
         ...(await api.applyPlugins({
           key: 'addMiddewares',
@@ -212,6 +226,7 @@ export default (api: IApi) => {
         })),
       ];
 
+      // 生成Server实例用来
       server = new Server({
         ...opts,
         compress: true,
@@ -228,6 +243,7 @@ export default (api: IApi) => {
         ...(api.config.devServer || {}),
       });
       const listenRet = await server.listen({
+        // 监听对应的端口
         port,
         hostname,
       });

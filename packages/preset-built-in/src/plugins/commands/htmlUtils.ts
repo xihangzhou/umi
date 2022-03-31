@@ -24,8 +24,14 @@ export function chunksToFiles(opts: {
   htmlChunks: (string | object)[];
   chunks?: webpack.compilation.Chunk[];
   noChunk?: boolean;
-}): { cssFiles: string[]; jsFiles: string[]; headJSFiles: string[] } {
+}): {
+  cssFiles: string[];
+  jsFiles: string[];
+  headJSFiles: string[];
+} {
   let chunksMap: IChunkMap = {};
+  // 建立chunk中的每个文件`${key}${extname(file)}`到file的映射
+  // file是文件名
   if (opts.chunks) {
     chunksMap = Array.from(opts.chunks).reduce((memo, chunk) => {
       const key = chunk.name || chunk.id;
@@ -48,14 +54,17 @@ export function chunksToFiles(opts: {
     return lodash.isPlainObject(htmlChunk) ? htmlChunk : { name: htmlChunk };
   });
   (htmlChunks as IHtmlChunk[]).forEach(({ name, headScript }: IHtmlChunk) => {
+    // 去找到config中配置的chunks对应在打包过后的cssFile
     const cssFile = opts.noChunk ? `${name}.css` : chunksMap[`${name}.css`];
     if (cssFile) {
       cssFiles.push(cssFile);
     }
 
+    // 同样找到config中配置的chunks对应在打包过后的js
     const jsFile = opts.noChunk ? `${name}.js` : chunksMap[`${name}.js`];
     assert(jsFile, `chunk of ${name} not found.`);
 
+    // 如果需要headScript就加到headJSFiles中
     if (headScript) {
       headJSFiles.push(jsFile);
     } else {
@@ -96,9 +105,14 @@ export function getHtmlGenerator({ api }: { api: IApi }): any {
         });
       }
 
+      // https://umijs.org/config#base
+      // 比如，你有路由 / 和 /users，然后设置了 base 为 /foo/，那么就可以通过 /foo/ 和 /foo/users 访问到之前的路由。
       let routerBaseStr = JSON.stringify(api.config.base);
+      // https://umijs.org/config#publicpath
+      // 配置 webpack 的 publicPath。当打包的时候，webpack 会在静态文件路径前面添加 publicPath 的值
       let publicPathStr = JSON.stringify(api.config.publicPath);
 
+      // 如果设置了exportStatic和dynamicRoot就要在html文件中动态的计算routerBaseStr
       if (api.config.exportStatic && api.config.exportStatic?.dynamicRoot) {
         routerBaseStr = `location.pathname.split('/').slice(0, -${
           args.route.path!.split('/').length - 1
@@ -107,6 +121,7 @@ export function getHtmlGenerator({ api }: { api: IApi }): any {
       }
 
       // window.resourceBaseUrl 用来兼容 egg.js 项目注入的 publicPath
+      // 这个publicPathStr会被放在html文件的头部被应用
       publicPathStr = `window.resourceBaseUrl || ${publicPathStr};`;
 
       publicPathStr = await api.applyPlugins({
@@ -118,6 +133,7 @@ export function getHtmlGenerator({ api }: { api: IApi }): any {
         },
       });
 
+      // 这个htmlChunks是在config中配置的chunks，默认为umi文件
       const htmlChunks = await api.applyPlugins({
         key: 'modifyHTMLChunks',
         type: api.ApplyPluginsType.modify,
@@ -128,12 +144,16 @@ export function getHtmlGenerator({ api }: { api: IApi }): any {
           chunks: args.chunks,
         },
       });
+
+      // 调用chunksToFiles，找到htmlChunks对应到webpack打包完成过后的结果中对应的cssFiles，jsFiles，headJSFiles
       const { cssFiles, jsFiles, headJSFiles } = chunksToFiles({
         htmlChunks,
         chunks: args.chunks,
         noChunk: args.noChunk,
       });
 
+      // 到目前为止收集完了要生成的html文件的内容的opts
+      // 接下来就可以调用父亲类上的html类的getContent方法来真正的获取方法，父亲类就是真正的Html类
       return await super.getContent({
         route: args.route,
         cssFiles,
